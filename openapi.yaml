@@ -802,11 +802,22 @@ paths:
 components:
   securitySchemes:
     oauth1:
-      type: http
-      scheme: oauth
+      type: apiKey
+      in: header
+      name: Authorization
       description: |
-        OAuth 1.0a authentication. You must obtain consumer keys and follow the 
+        OAuth 1.0a authentication. You must obtain consumer keys and follow the
         OAuth workflow to get access tokens for API calls.
+
+        The OAuth 1.0a flow consists of:
+        1. Obtain a request token using /oauth/request_token
+        2. Direct the user to authorize the request token
+        3. Exchange the authorized request token for an access token using /oauth/access_token
+        4. Use the access token to sign all API requests with OAuth 1.0a signature
+
+        All authenticated requests must include an Authorization header with OAuth 1.0a
+        parameters including oauth_consumer_key, oauth_token, oauth_signature_method,
+        oauth_signature, oauth_timestamp, and oauth_nonce.
 
   parameters:
     AccountIdKey:
