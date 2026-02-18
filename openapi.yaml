@@ -211,7 +211,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [SYMBOL, TYPE_NAME, EXCHANGE_NAME, CURRENCY, QUANTITY, LONG_OR_SHORT, DATE_ACQUIRED, PRICEPAID, TOTAL_GAIN, TOTAL_GAIN_PCT, MARKET_VALUE, BI]
+            enum: [SYMBOL, TYPE_NAME, EXCHANGE_NAME, CURRENCY, QUANTITY, LONG_OR_SHORT, DATE_ACQUIRED, PRICEPAID, TOTAL_GAIN, TOTAL_GAIN_PCT, MARKET_VALUE]
           description: Sort order for portfolio positions
         - name: sortOrder
           in: query
@@ -806,18 +806,38 @@ components:
       in: header
       name: Authorization
       description: |
-        OAuth 1.0a authentication. You must obtain consumer keys and follow the
-        OAuth workflow to get access tokens for API calls.
+        OAuth 1.0a authentication is required for all API endpoints.
 
-        The OAuth 1.0a flow consists of:
-        1. Obtain a request token using /oauth/request_token
-        2. Direct the user to authorize the request token
-        3. Exchange the authorized request token for an access token using /oauth/access_token
-        4. Use the access token to sign all API requests with OAuth 1.0a signature
+        **Note:** OpenAPI 3.0 does not have native support for OAuth 1.0a. This security
+        scheme uses the 'apiKey' type as a workaround to document that requests must include
+        an OAuth 1.0a signed Authorization header.
 
+        **OAuth 1.0a Flow:**
+        1. Obtain a request token using GET /oauth/request_token
+        2. Direct the user to E*TRADE's authorization page with the request token
+        3. Exchange the authorized request token for an access token using GET /oauth/access_token
+        4. Use the access token to sign all API requests with OAuth 1.0a signature (HMAC-SHA1)
+
+        **Authorization Header Format:**
         All authenticated requests must include an Authorization header with OAuth 1.0a
-        parameters including oauth_consumer_key, oauth_token, oauth_signature_method,
-        oauth_signature, oauth_timestamp, and oauth_nonce.
+        parameters:
+        - oauth_consumer_key: Your application's consumer key
+        - oauth_token: The access token obtained from the OAuth flow
+        - oauth_signature_method: HMAC-SHA1
+        - oauth_signature: The request signature
+        - oauth_timestamp: Current Unix timestamp
+        - oauth_nonce: A unique random string for this request
+        - oauth_version: 1.0
+
+        **Example:**
+        ```
+        Authorization: OAuth oauth_consumer_key="...", oauth_token="...",
+          oauth_signature_method="HMAC-SHA1", oauth_signature="...",
+          oauth_timestamp="...", oauth_nonce="...", oauth_version="1.0"
+        ```
+
+        For detailed implementation guidance, see the
+        [E*TRADE Developer Portal](https://developer.etrade.com/getting-started/developer-guides).
 
   parameters:
     AccountIdKey:
@@ -1793,7 +1813,7 @@ components:
               type: number
             ask:
               type: number
-            lastprice:
+            lastPrice:
               type: number
             currency:
               type: string
@@ -1983,7 +2003,7 @@ components:
           type: number
         ask:
           type: number
-        lastprice:
+        lastPrice:
           type: number
         currency:
           type: string
