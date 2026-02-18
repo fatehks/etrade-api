@@ -266,14 +266,12 @@ paths:
           in: query
           schema:
             type: string
-            format: date
-          description: Start date for transaction history (MM/DD/YYYY)
+          description: Start date for transaction history in MM/DD/YYYY format
         - name: endDate
           in: query
           schema:
             type: string
-            format: date
-          description: End date for transaction history (MM/DD/YYYY)
+          description: End date for transaction history in MM/DD/YYYY format
         - name: count
           in: query
           schema:
@@ -582,14 +580,12 @@ paths:
           in: query
           schema:
             type: string
-            format: date
-          description: Start date filter (MM/DD/YYYY)
+          description: Start date filter in MM/DD/YYYY format
         - name: toDate
           in: query
           schema:
             type: string
-            format: date
-          description: End date filter (MM/DD/YYYY)
+          description: End date filter in MM/DD/YYYY format
         - name: symbol
           in: query
           schema:
