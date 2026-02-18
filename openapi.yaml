@@ -1,0 +1,2114 @@
+openapi: 3.0.3
+info:
+  title: E*TRADE API
+  version: 1.0.0
+  description: |
+    The E*TRADE API provides programmatic access to account data, market information, 
+    order management, and alerts for E*TRADE customers. The API uses OAuth 1.0a for authentication.
+    
+    ## Key Features
+    - Account Management: Access account balances, portfolios, and transaction history
+    - Market Data: Real-time quotes, option chains, and product lookup
+    - Order Management: Preview, place, modify, and cancel orders
+    - Alerts: Manage and retrieve user alerts and notifications
+    
+    ## Authentication
+    All endpoints require OAuth 1.0a authentication. You must obtain consumer keys from the 
+    E*TRADE Developer Portal and follow the OAuth workflow to access the API.
+    
+    ## Environments
+    - Sandbox: https://apisb.etrade.com (for testing)
+    - Production: https://api.etrade.com (for live trading)
+  contact:
+    name: E*TRADE Developer Support
+    url: https://developer.etrade.com
+  license:
+    name: E*TRADE API License
+    url: https://developer.etrade.com/getting-started/developer-agreement
+
+servers:
+  - url: https://api.etrade.com
+    description: Production server
+  - url: https://apisb.etrade.com
+    description: Sandbox server
+
+security:
+  - oauth1: []
+
+tags:
+  - name: Authorization
+    description: OAuth 1.0a authentication endpoints
+  - name: Accounts
+    description: Account information and management
+  - name: Market Data
+    description: Real-time market quotes and option chains
+  - name: Orders
+    description: Order preview, placement, and management
+  - name: Alerts
+    description: User alerts and notifications
+
+paths:
+  # Authorization Endpoints
+  /oauth/request_token:
+    get:
+      tags:
+        - Authorization
+      summary: Get OAuth Request Token
+      description: |
+        First step in OAuth 1.0a flow. Obtain a request token that will be used 
+        to authorize the application.
+      operationId: getRequestToken
+      parameters:
+        - name: oauth_callback
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Callback URL after authorization
+      responses:
+        '200':
+          description: Request token obtained successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: oauth_token=ABC123&oauth_token_secret=XYZ789&oauth_callback_confirmed=true
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /oauth/access_token:
+    get:
+      tags:
+        - Authorization
+      summary: Get OAuth Access Token
+      description: |
+        Exchange the authorized request token for an access token that can be used 
+        to make authenticated API calls.
+      operationId: getAccessToken
+      parameters:
+        - name: oauth_verifier
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Verification code from authorization step
+      responses:
+        '200':
+          description: Access token obtained successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: oauth_token=ACCESS_TOKEN&oauth_token_secret=ACCESS_SECRET
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /oauth/renew_access_token:
+    get:
+      tags:
+        - Authorization
+      summary: Renew Access Token
+      description: Renew an existing access token before it expires
+      operationId: renewAccessToken
+      responses:
+        '200':
+          description: Access token renewed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /oauth/revoke_access_token:
+    get:
+      tags:
+        - Authorization
+      summary: Revoke Access Token
+      description: Revoke the current access token
+      operationId: revokeAccessToken
+      responses:
+        '200':
+          description: Access token revoked successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # Account Endpoints
+  /v1/accounts/list:
+    get:
+      tags:
+        - Accounts
+      summary: List Accounts
+      description: |
+        Retrieve a list of all accounts for the authenticated user. 
+        Returns account metadata including account type, mode, and IDs.
+      operationId: listAccounts
+      responses:
+        '200':
+          description: List of accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountListResponse'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/AccountListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/accounts/{accountIdKey}/balance:
+    get:
+      tags:
+        - Accounts
+      summary: Get Account Balance
+      description: |
+        Retrieve detailed balance information for a specific account, including 
+        cash balances, margin balances, and buying power.
+      operationId: getAccountBalance
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: instType
+          in: query
+          schema:
+            type: string
+            enum: [BROKERAGE, CHECKING, SAVINGS, CREDITCARD]
+          description: Institution type
+        - name: realTimeNAV
+          in: query
+          schema:
+            type: boolean
+          description: Include real-time net asset value
+      responses:
+        '200':
+          description: Account balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /v1/accounts/{accountIdKey}/portfolio:
+    get:
+      tags:
+        - Accounts
+      summary: Get Account Portfolio
+      description: |
+        Retrieve portfolio positions for a specific account, including holdings, 
+        quantities, cost basis, and current values.
+      operationId: getAccountPortfolio
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Number of records to return
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [SYMBOL, TYPE_NAME, EXCHANGE_NAME, CURRENCY, QUANTITY, LONG_OR_SHORT, DATE_ACQUIRED, PRICEPAID, TOTAL_GAIN, TOTAL_GAIN_PCT, MARKET_VALUE, BI]
+          description: Sort order for portfolio positions
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+          description: Sort direction
+        - name: marketSession
+          in: query
+          schema:
+            type: string
+            enum: [REGULAR, EXTENDED]
+          description: Market session for pricing
+        - name: totalsRequired
+          in: query
+          schema:
+            type: boolean
+          description: Include portfolio totals
+        - name: lotsRequired
+          in: query
+          schema:
+            type: boolean
+          description: Include lot details
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [QUICK, PERFORMANCE, FUNDAMENTAL, OPTIONSWATCH, COMPLETE]
+          description: Level of detail in response
+      responses:
+        '200':
+          description: Portfolio retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/accounts/{accountIdKey}/transactions:
+    get:
+      tags:
+        - Accounts
+      summary: List Account Transactions
+      description: |
+        Retrieve transaction history for a specific account with optional 
+        filtering by date range and transaction type.
+      operationId: listTransactions
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date for transaction history (MM/DD/YYYY)
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date for transaction history (MM/DD/YYYY)
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Number of records to return
+        - name: marker
+          in: query
+          schema:
+            type: string
+          description: Pagination marker
+      responses:
+        '200':
+          description: Transaction list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/accounts/{accountIdKey}/transactions/{transactionId}:
+    get:
+      tags:
+        - Accounts
+      summary: Get Transaction Details
+      description: Retrieve detailed information for a specific transaction
+      operationId: getTransactionDetails
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction ID
+      responses:
+        '200':
+          description: Transaction details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionDetailsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # Market Data Endpoints
+  /v1/market/quote/{symbols}:
+    get:
+      tags:
+        - Market Data
+      summary: Get Market Quotes
+      description: |
+        Retrieve real-time or delayed quotes for one or more symbols. 
+        Supports stocks, options, ETFs, and mutual funds.
+      operationId: getQuotes
+      parameters:
+        - name: symbols
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Comma-separated list of symbols (max 25)
+          example: AAPL,MSFT,GOOGL
+        - name: detailFlag
+          in: query
+          schema:
+            type: string
+            enum: [ALL, FUNDAMENTAL, INTRADAY, OPTIONS, WEEK_52, MF_DETAIL]
+          description: Level of detail to include in quote
+        - name: requireEarningsDate
+          in: query
+          schema:
+            type: boolean
+          description: Include earnings date information
+        - name: skipMiniOptionsCheck
+          in: query
+          schema:
+            type: boolean
+          description: Skip mini options check
+      responses:
+        '200':
+          description: Quotes retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/market/optionchains:
+    get:
+      tags:
+        - Market Data
+      summary: Get Option Chains
+      description: |
+        Retrieve option chains for a specific underlying symbol, including 
+        strike prices, expirations, and Greeks.
+      operationId: getOptionChains
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Underlying symbol
+        - name: expiryYear
+          in: query
+          schema:
+            type: integer
+          description: Expiration year (YYYY)
+        - name: expiryMonth
+          in: query
+          schema:
+            type: integer
+          description: Expiration month (1-12)
+        - name: expiryDay
+          in: query
+          schema:
+            type: integer
+          description: Expiration day (1-31)
+        - name: strikePriceNear
+          in: query
+          schema:
+            type: number
+          description: Strike price to center results around
+        - name: noOfStrikes
+          in: query
+          schema:
+            type: integer
+          description: Number of strikes to return
+        - name: optionCategory
+          in: query
+          schema:
+            type: string
+            enum: [STANDARD, ALL, MINI]
+          description: Option category filter
+        - name: chainType
+          in: query
+          schema:
+            type: string
+            enum: [CALL, PUT, CALLPUT]
+          description: Type of options to return
+        - name: priceType
+          in: query
+          schema:
+            type: string
+            enum: [ATNM, ALL]
+          description: Price type filter
+      responses:
+        '200':
+          description: Option chains retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OptionChainResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/market/optionexpiredate:
+    get:
+      tags:
+        - Market Data
+      summary: Get Option Expiration Dates
+      description: Retrieve available expiration dates for options on a given symbol
+      operationId: getOptionExpirationDates
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Underlying symbol
+        - name: expiryType
+          in: query
+          schema:
+            type: string
+            enum: [WEEKLY, MONTHLY, QUARTERLY, ALL]
+          description: Type of expirations to return
+      responses:
+        '200':
+          description: Expiration dates retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpirationDateResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/market/lookup/{search}:
+    get:
+      tags:
+        - Market Data
+      summary: Product Lookup
+      description: Search for securities by symbol or company name
+      operationId: productLookup
+      parameters:
+        - name: search
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Search term (symbol or company name)
+      responses:
+        '200':
+          description: Lookup results retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # Order Endpoints
+  /v1/accounts/{accountIdKey}/orders/preview:
+    post:
+      tags:
+        - Orders
+      summary: Preview Order
+      description: |
+        Preview an order before placement to verify parameters and see 
+        estimated costs and commissions.
+      operationId: previewOrder
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewOrderRequest'
+      responses:
+        '200':
+          description: Order preview generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewOrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/accounts/{accountIdKey}/orders/place:
+    post:
+      tags:
+        - Orders
+      summary: Place Order
+      description: |
+        Submit an order for execution. Order must be previewed first and 
+        the preview IDs must be included in the request.
+      operationId: placeOrder
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+      responses:
+        '200':
+          description: Order placed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceOrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/accounts/{accountIdKey}/orders:
+    get:
+      tags:
+        - Orders
+      summary: List Orders
+      description: Retrieve list of orders for an account with optional filtering
+      operationId: listOrders
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: marker
+          in: query
+          schema:
+            type: string
+          description: Pagination marker
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 25
+          description: Number of records to return
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [OPEN, EXECUTED, CANCELLED, INDIVIDUAL_FILLS, CANCEL_REQUESTED, EXPIRED, REJECTED]
+          description: Filter by order status
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date filter (MM/DD/YYYY)
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date filter (MM/DD/YYYY)
+        - name: symbol
+          in: query
+          schema:
+            type: string
+          description: Filter by symbol
+        - name: securityType
+          in: query
+          schema:
+            type: string
+            enum: [EQ, OPTN, MF, MMF]
+          description: Filter by security type
+        - name: transactionType
+          in: query
+          schema:
+            type: string
+            enum: [BUY, SELL, SELL_SHORT, BUY_TO_COVER]
+          description: Filter by transaction type
+        - name: marketSession
+          in: query
+          schema:
+            type: string
+            enum: [REGULAR, EXTENDED]
+          description: Filter by market session
+      responses:
+        '200':
+          description: Order list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/accounts/{accountIdKey}/orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Get Order Details
+      description: Retrieve details for a specific order
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Order ID
+      responses:
+        '200':
+          description: Order details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      tags:
+        - Orders
+      summary: Modify Order
+      description: Change parameters of an existing open order
+      operationId: modifyOrder
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Order ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModifyOrderRequest'
+      responses:
+        '200':
+          description: Order modified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModifyOrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    delete:
+      tags:
+        - Orders
+      summary: Cancel Order
+      description: Cancel an open order
+      operationId: cancelOrder
+      parameters:
+        - $ref: '#/components/parameters/AccountIdKey'
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Order ID
+      responses:
+        '200':
+          description: Order cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelOrderResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # Alerts Endpoints
+  /v1/user/alerts:
+    get:
+      tags:
+        - Alerts
+      summary: List Alerts
+      description: Retrieve list of alerts for the authenticated user
+      operationId: listAlerts
+      parameters:
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 25
+          description: Number of alerts to return
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [STOCK, ACCOUNT]
+          description: Filter alerts by category
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [READ, UNREAD]
+          description: Filter alerts by read status
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+          description: Sort direction
+      responses:
+        '200':
+          description: Alert list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/user/alerts/{alertId}:
+    get:
+      tags:
+        - Alerts
+      summary: Get Alert Details
+      description: Retrieve details for a specific alert
+      operationId: getAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Alert ID
+      responses:
+        '200':
+          description: Alert details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDetailsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - Alerts
+      summary: Delete Alert
+      description: Delete a specific alert
+      operationId: deleteAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Alert ID
+      responses:
+        '200':
+          description: Alert deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAlertResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+  securitySchemes:
+    oauth1:
+      type: http
+      scheme: oauth
+      description: |
+        OAuth 1.0a authentication. You must obtain consumer keys and follow the 
+        OAuth workflow to get access tokens for API calls.
+
+  parameters:
+    AccountIdKey:
+      name: accountIdKey
+      in: path
+      required: true
+      schema:
+        type: string
+      description: |
+        Account identifier key in the format {accountId}-{institutionType}. 
+        Example: 12345678-BROKERAGE
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # Common Schemas
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error details
+
+    TokenResponse:
+      type: object
+      properties:
+        oauth_token:
+          type: string
+          description: OAuth access token
+        oauth_token_secret:
+          type: string
+          description: OAuth token secret
+
+    # Account Schemas
+    AccountListResponse:
+      type: object
+      properties:
+        AccountListResponse:
+          type: object
+          properties:
+            Accounts:
+              type: object
+              properties:
+                Account:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Account'
+
+    Account:
+      type: object
+      properties:
+        accountId:
+          type: string
+          description: Account ID
+        accountIdKey:
+          type: string
+          description: Account ID Key (accountId-institutionType)
+        accountMode:
+          type: string
+          enum: [CASH, MARGIN, IRA]
+          description: Account mode
+        accountDesc:
+          type: string
+          description: Account description
+        accountName:
+          type: string
+          description: Account name
+        accountType:
+          type: string
+          enum: [INDIVIDUAL, JOINT, CORPORATE, IRA, TRUST]
+          description: Account type
+        institutionType:
+          type: string
+          enum: [BROKERAGE, CHECKING, SAVINGS, CREDITCARD]
+          description: Institution type
+        accountStatus:
+          type: string
+          enum: [ACTIVE, CLOSED]
+          description: Account status
+        closedDate:
+          type: integer
+          description: Account closed date (Unix timestamp)
+
+    BalanceResponse:
+      type: object
+      properties:
+        BalanceResponse:
+          type: object
+          properties:
+            accountId:
+              type: string
+            accountType:
+              type: string
+            optionLevel:
+              type: string
+            accountDescription:
+              type: string
+            quoteMode:
+              type: integer
+            dayTraderStatus:
+              type: string
+            accountMode:
+              type: string
+            Cash:
+              $ref: '#/components/schemas/CashBalance'
+            Computed:
+              $ref: '#/components/schemas/ComputedBalance'
+
+    CashBalance:
+      type: object
+      properties:
+        fundsForOpenOrdersCash:
+          type: number
+        moneyMktBalance:
+          type: number
+
+    ComputedBalance:
+      type: object
+      properties:
+        cashAvailableForInvestment:
+          type: number
+        cashAvailableForWithdrawal:
+          type: number
+        totalAvailableForWithdrawal:
+          type: number
+        netCash:
+          type: number
+        cashBalance:
+          type: number
+        settledCashForInvestment:
+          type: number
+        unSettledCashForInvestment:
+          type: number
+        fundsWithheldFromPurchasePower:
+          type: number
+        fundsWithheldFromWithdrawal:
+          type: number
+        marginBuyingPower:
+          type: number
+        cashBuyingPower:
+          type: number
+        dtMarginBuyingPower:
+          type: number
+        dtCashBuyingPower:
+          type: number
+        shortAdjustBalance:
+          type: number
+        regtEquity:
+          type: number
+        regtEquityPercent:
+          type: number
+        accountBalance:
+          type: number
+        RealTimeValues:
+          $ref: '#/components/schemas/RealTimeValues'
+
+    RealTimeValues:
+      type: object
+      properties:
+        totalAccountValue:
+          type: number
+        netMv:
+          type: number
+        netMvLong:
+          type: number
+        netMvShort:
+          type: number
+        totalLongValue:
+          type: number
+
+    PortfolioResponse:
+      type: object
+      properties:
+        PortfolioResponse:
+          type: object
+          properties:
+            AccountPortfolio:
+              type: array
+              items:
+                $ref: '#/components/schemas/AccountPortfolio'
+            Totals:
+              $ref: '#/components/schemas/PortfolioTotals'
+
+    AccountPortfolio:
+      type: object
+      properties:
+        accountId:
+          type: string
+        next:
+          type: string
+        totalNoOfPages:
+          type: integer
+        nextPageNo:
+          type: string
+        Position:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+
+    Position:
+      type: object
+      properties:
+        positionId:
+          type: integer
+        Product:
+          $ref: '#/components/schemas/Product'
+        symbolDescription:
+          type: string
+        dateAcquired:
+          type: integer
+        pricePaid:
+          type: number
+        commissions:
+          type: number
+        otherFees:
+          type: number
+        quantity:
+          type: number
+        positionIndicator:
+          type: string
+          enum: [LONG, SHORT]
+        positionType:
+          type: string
+        daysGain:
+          type: number
+        daysGainPct:
+          type: number
+        marketValue:
+          type: number
+        totalCost:
+          type: number
+        totalGain:
+          type: number
+        totalGainPct:
+          type: number
+        pctOfPortfolio:
+          type: number
+        costPerShare:
+          type: number
+        todayCommissions:
+          type: number
+        todayFees:
+          type: number
+        todayPricePaid:
+          type: number
+        todayQuantity:
+          type: number
+        Quick:
+          $ref: '#/components/schemas/QuickView'
+        Complete:
+          $ref: '#/components/schemas/CompleteView'
+
+    Product:
+      type: object
+      properties:
+        symbol:
+          type: string
+        securityType:
+          type: string
+          enum: [EQ, OPTN, MF, MMF]
+        callPut:
+          type: string
+          enum: [CALL, PUT]
+        expiryYear:
+          type: integer
+        expiryMonth:
+          type: integer
+        expiryDay:
+          type: integer
+        strikePrice:
+          type: number
+        expiryType:
+          type: string
+
+    QuickView:
+      type: object
+      properties:
+        lastTrade:
+          type: number
+        lastTradeTime:
+          type: integer
+        change:
+          type: number
+        changePct:
+          type: number
+        volume:
+          type: integer
+
+    CompleteView:
+      type: object
+      properties:
+        ask:
+          type: number
+        askSize:
+          type: integer
+        bid:
+          type: number
+        bidSize:
+          type: integer
+        high:
+          type: number
+        low:
+          type: number
+        open:
+          type: number
+        previousClose:
+          type: number
+
+    PortfolioTotals:
+      type: object
+      properties:
+        cashBalance:
+          type: number
+        todaysGainLoss:
+          type: number
+        todaysGainLossPct:
+          type: number
+        totalMarketValue:
+          type: number
+        totalGainLoss:
+          type: number
+        totalGainLossPct:
+          type: number
+        totalPricePaid:
+          type: number
+
+    TransactionListResponse:
+      type: object
+      properties:
+        TransactionListResponse:
+          type: object
+          properties:
+            Transaction:
+              type: array
+              items:
+                $ref: '#/components/schemas/Transaction'
+            marker:
+              type: string
+            moreTransactions:
+              type: boolean
+
+    Transaction:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        accountId:
+          type: string
+        transactionDate:
+          type: integer
+        postDate:
+          type: integer
+        amount:
+          type: number
+        description:
+          type: string
+        description2:
+          type: string
+        category:
+          type: string
+        quantity:
+          type: number
+        price:
+          type: number
+        commission:
+          type: number
+        fees:
+          type: number
+        settlementCurrency:
+          type: string
+        paymentCurrency:
+          type: string
+        fee:
+          type: number
+        settlementDate:
+          type: integer
+        imageFlag:
+          type: boolean
+        instType:
+          type: string
+        brokerage:
+          $ref: '#/components/schemas/BrokerageTransaction'
+
+    BrokerageTransaction:
+      type: object
+      properties:
+        transactionType:
+          type: string
+        quantity:
+          type: number
+        price:
+          type: number
+        settlementCurrency:
+          type: string
+        paymentCurrency:
+          type: string
+        fee:
+          type: number
+        settlementDate:
+          type: integer
+        Product:
+          $ref: '#/components/schemas/Product'
+
+    TransactionDetailsResponse:
+      type: object
+      properties:
+        TransactionDetailsResponse:
+          type: object
+          properties:
+            Transaction:
+              $ref: '#/components/schemas/TransactionDetails'
+
+    TransactionDetails:
+      allOf:
+        - $ref: '#/components/schemas/Transaction'
+        - type: object
+          properties:
+            detailsUnavailable:
+              type: boolean
+
+    # Market Data Schemas
+    QuoteResponse:
+      type: object
+      properties:
+        QuoteResponse:
+          type: object
+          properties:
+            QuoteData:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuoteData'
+            Messages:
+              $ref: '#/components/schemas/Messages'
+
+    QuoteData:
+      type: object
+      properties:
+        dateTime:
+          type: string
+        dateTimeUTC:
+          type: integer
+        quoteStatus:
+          type: string
+        ahFlag:
+          type: string
+        Product:
+          $ref: '#/components/schemas/Product'
+        All:
+          $ref: '#/components/schemas/AllQuoteDetails'
+        Fundamental:
+          $ref: '#/components/schemas/FundamentalData'
+        Intraday:
+          $ref: '#/components/schemas/IntradayData'
+        Option:
+          $ref: '#/components/schemas/OptionData'
+        Week52:
+          $ref: '#/components/schemas/Week52Data'
+
+    AllQuoteDetails:
+      type: object
+      properties:
+        adjustedFlag:
+          type: boolean
+        ask:
+          type: number
+        askSize:
+          type: integer
+        askTime:
+          type: string
+        bid:
+          type: number
+        bidExchange:
+          type: string
+        bidSize:
+          type: integer
+        bidTime:
+          type: string
+        changeClose:
+          type: number
+        changeClosePercentage:
+          type: number
+        companyName:
+          type: string
+        daysToExpiration:
+          type: integer
+        dirLast:
+          type: string
+        dividend:
+          type: number
+        eps:
+          type: number
+        estEarnings:
+          type: number
+        exDividendDate:
+          type: integer
+        high:
+          type: number
+        high52:
+          type: number
+        lastTrade:
+          type: number
+        low:
+          type: number
+        low52:
+          type: number
+        open:
+          type: number
+        openInterest:
+          type: integer
+        previousClose:
+          type: number
+        previousDayVolume:
+          type: integer
+        primaryExchange:
+          type: string
+        symbolDescription:
+          type: string
+        totalVolume:
+          type: integer
+        upc:
+          type: integer
+        volume10Day:
+          type: integer
+        cashDeliverable:
+          type: number
+        marketCap:
+          type: number
+        sharesOutstanding:
+          type: integer
+        nextEarningDate:
+          type: string
+        beta:
+          type: number
+        yield:
+          type: number
+        declaredDividend:
+          type: number
+        dividendPayableDate:
+          type: integer
+        pe:
+          type: number
+        marketCloseBidSize:
+          type: integer
+        marketCloseAskSize:
+          type: integer
+        marketCloseVolume:
+          type: integer
+        week52LowDate:
+          type: integer
+        week52HiDate:
+          type: integer
+        intrinsicValue:
+          type: number
+        timePremium:
+          type: number
+        optionMultiplier:
+          type: number
+        contractSize:
+          type: number
+        expirationDate:
+          type: integer
+        optionPreviousBidPrice:
+          type: number
+        optionPreviousAskPrice:
+          type: number
+        osiKey:
+          type: string
+        timeOfLastTrade:
+          type: integer
+        averageVolume:
+          type: integer
+
+    FundamentalData:
+      type: object
+      properties:
+        companyName:
+          type: string
+        eps:
+          type: number
+        estEarnings:
+          type: number
+        dividend:
+          type: number
+        exDividendDate:
+          type: integer
+        pe:
+          type: number
+        beta:
+          type: number
+        marketCap:
+          type: number
+        sharesOutstanding:
+          type: integer
+
+    IntradayData:
+      type: object
+      properties:
+        lastTrade:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        volume:
+          type: integer
+
+    OptionData:
+      type: object
+      properties:
+        optionType:
+          type: string
+        strikePrice:
+          type: number
+        expirationDate:
+          type: integer
+        daysToExpiration:
+          type: integer
+        openInterest:
+          type: integer
+        impliedVolatility:
+          type: number
+        delta:
+          type: number
+        gamma:
+          type: number
+        theta:
+          type: number
+        vega:
+          type: number
+        rho:
+          type: number
+
+    Week52Data:
+      type: object
+      properties:
+        high52:
+          type: number
+        low52:
+          type: number
+        week52LowDate:
+          type: integer
+        week52HiDate:
+          type: integer
+        changeFrom52High:
+          type: number
+        changeFrom52Low:
+          type: number
+        percentChangeFrom52High:
+          type: number
+        percentChangeFrom52Low:
+          type: number
+
+    Messages:
+      type: object
+      properties:
+        Message:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              code:
+                type: integer
+              type:
+                type: string
+
+    OptionChainResponse:
+      type: object
+      properties:
+        OptionChainResponse:
+          type: object
+          properties:
+            OptionPair:
+              type: array
+              items:
+                $ref: '#/components/schemas/OptionPair'
+            SelectedED:
+              $ref: '#/components/schemas/ExpirationDate'
+
+    OptionPair:
+      type: object
+      properties:
+        Call:
+          $ref: '#/components/schemas/OptionDetails'
+        Put:
+          $ref: '#/components/schemas/OptionDetails'
+
+    OptionDetails:
+      type: object
+      properties:
+        optionCategory:
+          type: string
+        optionRootSymbol:
+          type: string
+        timeStamp:
+          type: integer
+        adjustedFlag:
+          type: boolean
+        displaySymbol:
+          type: string
+        optionType:
+          type: string
+        strikePrice:
+          type: number
+        symbol:
+          type: string
+        bid:
+          type: number
+        ask:
+          type: number
+        bidSize:
+          type: integer
+        askSize:
+          type: integer
+        inTheMoney:
+          type: string
+        volume:
+          type: integer
+        openInterest:
+          type: integer
+        netChange:
+          type: number
+        lastPrice:
+          type: number
+        quoteDetail:
+          type: string
+        osiKey:
+          type: string
+        OptionGreeks:
+          $ref: '#/components/schemas/OptionGreeks'
+
+    OptionGreeks:
+      type: object
+      properties:
+        rho:
+          type: number
+        vega:
+          type: number
+        theta:
+          type: number
+        delta:
+          type: number
+        gamma:
+          type: number
+        iv:
+          type: number
+        currentValue:
+          type: boolean
+
+    ExpirationDate:
+      type: object
+      properties:
+        year:
+          type: integer
+        month:
+          type: integer
+        day:
+          type: integer
+        expiryType:
+          type: string
+
+    ExpirationDateResponse:
+      type: object
+      properties:
+        OptionExpireDateResponse:
+          type: object
+          properties:
+            ExpirationDate:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExpirationDate'
+
+    LookupResponse:
+      type: object
+      properties:
+        LookupResponse:
+          type: object
+          properties:
+            Data:
+              type: array
+              items:
+                $ref: '#/components/schemas/LookupResult'
+
+    LookupResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+
+    # Order Schemas
+    PreviewOrderRequest:
+      type: object
+      required:
+        - PreviewOrderRequest
+      properties:
+        PreviewOrderRequest:
+          type: object
+          required:
+            - orderType
+            - Order
+          properties:
+            orderType:
+              type: string
+              enum: [EQ, OPTN, SPREADS, BUY_WRITES, BUTTERFLY, IRON_BUTTERFLY, CONDOR, IRON_CONDOR, MF, MMF]
+            clientOrderId:
+              type: string
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderDetail'
+
+    OrderDetail:
+      type: object
+      properties:
+        allOrNone:
+          type: boolean
+        priceType:
+          type: string
+          enum: [MARKET, LIMIT, STOP, STOP_LIMIT, TRAILING_STOP_CNST_BY_LOWER_TRIGGER, UPPER_TRIGGER_BY_TRAILING_STOP_CNST, TRAILING_STOP_PRCT_BY_LOWER_TRIGGER, UPPER_TRIGGER_BY_TRAILING_STOP_PRCT, TRAILING_STOP_CNST, TRAILING_STOP_PRCT, HIDDEN_STOP, HIDDEN_STOP_BY_LOWER_TRIGGER, UPPER_TRIGGER_BY_HIDDEN_STOP, NET_DEBIT, NET_CREDIT, NET_EVEN, MARKET_ON_OPEN, MARKET_ON_CLOSE, LIMIT_ON_OPEN, LIMIT_ON_CLOSE]
+        orderTerm:
+          type: string
+          enum: [GOOD_UNTIL_CANCEL, GOOD_FOR_DAY, IMMEDIATE_OR_CANCEL, FILL_OR_KILL]
+        marketSession:
+          type: string
+          enum: [REGULAR, EXTENDED]
+        stopPrice:
+          type: number
+        limitPrice:
+          type: number
+        Instrument:
+          type: array
+          items:
+            $ref: '#/components/schemas/Instrument'
+
+    Instrument:
+      type: object
+      properties:
+        Product:
+          $ref: '#/components/schemas/Product'
+        orderAction:
+          type: string
+          enum: [BUY, SELL, BUY_TO_COVER, SELL_SHORT, BUY_OPEN, BUY_CLOSE, SELL_OPEN, SELL_CLOSE, EXCHANGE]
+        quantityType:
+          type: string
+          enum: [QUANTITY, DOLLAR, ALL_I_OWN]
+        quantity:
+          type: number
+
+    PreviewOrderResponse:
+      type: object
+      properties:
+        PreviewOrderResponse:
+          type: object
+          properties:
+            orderType:
+              type: string
+            totalOrderValue:
+              type: number
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/PreviewOrder'
+            PreviewIds:
+              type: array
+              items:
+                $ref: '#/components/schemas/PreviewId'
+            portSecType:
+              type: string
+            dstFlag:
+              type: boolean
+            optionLevelCd:
+              type: integer
+            marginLevelCd:
+              type: string
+            Disclosure:
+              $ref: '#/components/schemas/Disclosure'
+
+    PreviewOrder:
+      type: object
+      properties:
+        Instrument:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreviewInstrument'
+        priceType:
+          type: string
+        limitPrice:
+          type: number
+        stopPrice:
+          type: number
+        orderTerm:
+          type: string
+        marketSession:
+          type: string
+        allOrNone:
+          type: boolean
+        messages:
+          $ref: '#/components/schemas/Messages'
+        estimatedCommission:
+          type: number
+        estimatedTotalAmount:
+          type: number
+        netPrice:
+          type: number
+        netBid:
+          type: number
+        netAsk:
+          type: number
+        gcd:
+          type: integer
+        ratio:
+          type: string
+
+    PreviewInstrument:
+      allOf:
+        - $ref: '#/components/schemas/Instrument'
+        - type: object
+          properties:
+            symbolDescription:
+              type: string
+            orderAction:
+              type: string
+            quantity:
+              type: number
+            cancelQuantity:
+              type: number
+            orderedQuantity:
+              type: number
+            filledQuantity:
+              type: number
+            averageExecutionPrice:
+              type: number
+            estimatedCommission:
+              type: number
+            estimatedFees:
+              type: number
+            bid:
+              type: number
+            ask:
+              type: number
+            lastprice:
+              type: number
+            currency:
+              type: string
+            quoteStatus:
+              type: string
+
+    PreviewId:
+      type: object
+      properties:
+        previewId:
+          type: integer
+        cashMargin:
+          type: string
+
+    Disclosure:
+      type: object
+      properties:
+        ahDisclosureFlag:
+          type: boolean
+        aoDisclosureFlag:
+          type: boolean
+        conditionalDisclosureFlag:
+          type: boolean
+        ehDisclosureFlag:
+          type: boolean
+
+    PlaceOrderRequest:
+      type: object
+      required:
+        - PlaceOrderRequest
+      properties:
+        PlaceOrderRequest:
+          type: object
+          required:
+            - orderType
+            - PreviewIds
+            - Order
+          properties:
+            orderType:
+              type: string
+              enum: [EQ, OPTN, SPREADS, BUY_WRITES, BUTTERFLY, IRON_BUTTERFLY, CONDOR, IRON_CONDOR, MF, MMF]
+            clientOrderId:
+              type: string
+            PreviewIds:
+              type: array
+              items:
+                $ref: '#/components/schemas/PreviewId'
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderDetail'
+
+    PlaceOrderResponse:
+      type: object
+      properties:
+        PlaceOrderResponse:
+          type: object
+          properties:
+            orderType:
+              type: string
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/PlacedOrder'
+            dstFlag:
+              type: boolean
+            optionLevelCd:
+              type: integer
+            marginLevelCd:
+              type: string
+            OrderIds:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderId'
+
+    PlacedOrder:
+      allOf:
+        - $ref: '#/components/schemas/PreviewOrder'
+        - type: object
+          properties:
+            placedTime:
+              type: integer
+            accountId:
+              type: string
+
+    OrderId:
+      type: object
+      properties:
+        orderId:
+          type: integer
+        cashMargin:
+          type: string
+
+    OrderListResponse:
+      type: object
+      properties:
+        OrdersResponse:
+          type: object
+          properties:
+            marker:
+              type: string
+            next:
+              type: string
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderRecord'
+
+    OrderRecord:
+      type: object
+      properties:
+        orderId:
+          type: integer
+        details:
+          type: string
+        orderType:
+          type: string
+        OrderDetail:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderDetailRecord'
+        messages:
+          $ref: '#/components/schemas/Messages'
+
+    OrderDetailRecord:
+      type: object
+      properties:
+        orderNumber:
+          type: integer
+        accountId:
+          type: string
+        placedTime:
+          type: integer
+        executedTime:
+          type: integer
+        orderValue:
+          type: number
+        status:
+          type: string
+        orderType:
+          type: string
+        orderTerm:
+          type: string
+        priceType:
+          type: string
+        limitPrice:
+          type: number
+        stopPrice:
+          type: number
+        marketSession:
+          type: string
+        allOrNone:
+          type: boolean
+        Instrument:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstrumentRecord'
+        messages:
+          $ref: '#/components/schemas/Messages'
+
+    InstrumentRecord:
+      type: object
+      properties:
+        Product:
+          $ref: '#/components/schemas/Product'
+        symbolDescription:
+          type: string
+        orderAction:
+          type: string
+        quantityType:
+          type: string
+        quantity:
+          type: number
+        cancelQuantity:
+          type: number
+        orderedQuantity:
+          type: number
+        filledQuantity:
+          type: number
+        averageExecutionPrice:
+          type: number
+        estimatedCommission:
+          type: number
+        estimatedFees:
+          type: number
+        bid:
+          type: number
+        ask:
+          type: number
+        lastprice:
+          type: number
+        currency:
+          type: string
+
+    OrderDetailsResponse:
+      type: object
+      properties:
+        OrderDetailsResponse:
+          type: object
+          properties:
+            orderType:
+              type: string
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderDetailRecord'
+
+    ModifyOrderRequest:
+      type: object
+      required:
+        - ModifyOrderRequest
+      properties:
+        ModifyOrderRequest:
+          type: object
+          required:
+            - orderType
+            - Order
+          properties:
+            orderType:
+              type: string
+            clientOrderId:
+              type: string
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderDetail'
+
+    ModifyOrderResponse:
+      type: object
+      properties:
+        ModifyOrderResponse:
+          type: object
+          properties:
+            accountId:
+              type: string
+            orderType:
+              type: string
+            totalOrderValue:
+              type: number
+            Order:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderDetailRecord'
+            dstFlag:
+              type: boolean
+            optionLevelCd:
+              type: integer
+            marginLevelCd:
+              type: string
+
+    CancelOrderResponse:
+      type: object
+      properties:
+        CancelOrderResponse:
+          type: object
+          properties:
+            accountId:
+              type: string
+            orderId:
+              type: integer
+            cancelTime:
+              type: integer
+            Messages:
+              $ref: '#/components/schemas/Messages'
+
+    # Alerts Schemas
+    AlertListResponse:
+      type: object
+      properties:
+        AlertsResponse:
+          type: object
+          properties:
+            Alert:
+              type: array
+              items:
+                $ref: '#/components/schemas/Alert'
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: integer
+        createTime:
+          type: integer
+        subject:
+          type: string
+        msgText:
+          type: string
+        readTime:
+          type: integer
+        deleteTime:
+          type: integer
+        symbol:
+          type: string
+
+    AlertDetailsResponse:
+      type: object
+      properties:
+        AlertDetailsResponse:
+          type: object
+          properties:
+            id:
+              type: integer
+            createTime:
+              type: integer
+            subject:
+              type: string
+            msgText:
+              type: string
+            readTime:
+              type: integer
+            symbol:
+              type: string
+            next:
+              type: string
+            prev:
+              type: string
+
+    DeleteAlertResponse:
+      type: object
+      properties:
+        AlertsResponse:
+          type: object
+          properties:
+            result:
+              type: string
+              enum: [SUCCESS, FAILURE]
+            Alert:
+              $ref: '#/components/schemas/Alert'
